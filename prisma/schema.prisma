@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
@@ -13,10 +10,40 @@ datasource db {
   provider = "postgresql"
 }
 
+// ====================================================
+// ENUMS
+// ====================================================
+
+enum UserRole {
+  ADMIN
+  SECRETAIRE
+  GESTIONNAIRE_STOCK
+  VENDEUR
+}
+
+enum SaleStatus {
+  PAID
+  UNPAID
+  PARTIAL
+  CANCELLED
+}
+
+enum StockMovementType {
+  IN // Achat fournisseur
+  OUT // Vente
+  LOSS // Perte/casse
+  ADJUSTMENT // Ajustement manuel
+}
+
+// ====================================================
+// AUTH MODELS
+// ====================================================
+
 model User {
-  id    String  @id @default(uuid())
-  email String  @unique
+  id    String   @id @default(uuid())
+  email String   @unique
   name  String?
+  role  UserRole @default(VENDEUR)
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -25,6 +52,14 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
+  // Relations métier
+  purchasesCreated      Purchase[]      @relation("PurchaseCreatedBy")
+  salesCreated          Sale[]          @relation("SaleCreatedBy")
+  stockMovementsCreated StockMovement[] @relation("StockMovementCreatedBy")
+  clientPaymentsCreated ClientPayment[] @relation("ClientPaymentCreatedBy")
+  expensesCreated       Expense[]       @relation("ExpenseCreatedBy")
+
+  @@index([role])
   @@map("user")
 }
 
@@ -71,4 +106,257 @@ model Verification {
   updatedAt  DateTime @default(now()) @updatedAt
 
   @@map("verification")
+}
+
+// ====================================================
+// BUSINESS MODELS
+// ====================================================
+
+// Variantes globales (33cl, 66cl, 100cl, etc.)
+model Variant {
+  id          String  @id @default(uuid())
+  name        String  @unique // "33cl", "66cl", "100cl"
+  sizeInMl    Int // 330, 660, 1000
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productVariants ProductVariant[]
+
+  @@map("variant")
+}
+
+// Produit (ex: Heineken, Coca-Cola)
+model Product {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants ProductVariant[]
+
+  @@index([isActive])
+  @@map("product")
+}
+
+// Pivot produit-variante avec stock, prix et coût
+model ProductVariant {
+  id        String @id @default(uuid())
+  productId String
+  variantId String
+
+  // Taille du casier (12 ou 24 bouteilles)
+  casierSize Int @default(12)
+
+  // Stock en demi-casiers (unité interne)
+  stockHalf Int @default(0)
+
+  // Seuil d'alerte (en demi-casiers)
+  alertThresholdHalf Int @default(10)
+
+  // Prix de vente par casier
+  sellingPriceCasier Decimal @db.Decimal(10, 2)
+
+  // Coût moyen pondéré par casier
+  averageCostCasier Decimal @default(0) @db.Decimal(10, 2)
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  purchases      Purchase[]
+  saleItems      SaleItem[]
+  stockMovements StockMovement[]
+
+  @@unique([productId, variantId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([isActive])
+  @@index([stockHalf])
+  @@map("product_variant")
+}
+
+// Achat fournisseur
+model Purchase {
+  id               String  @id @default(uuid())
+  productVariantId String
+  supplierName     String?
+  invoiceNumber    String?
+
+  // Quantité achetée en casiers (Int uniquement)
+  quantityCasier Int
+
+  // Prix d'achat par casier
+  purchasePriceCasier Decimal @db.Decimal(10, 2)
+
+  // Total calculé
+  totalAmount Decimal @db.Decimal(10, 2)
+
+  notes String?
+
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
+
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@index([productVariantId])
+  @@index([createdById])
+  @@index([createdAt])
+  @@map("purchase")
+}
+
+// Mouvement de stock (traçabilité)
+model StockMovement {
+  id               String            @id @default(uuid())
+  productVariantId String
+  type             StockMovementType
+
+  // Quantité en demi-casiers (positif pour IN, négatif pour OUT/LOSS)
+  quantityHalf Int
+
+  // Stock après mouvement
+  stockAfter Int
+
+  // Référence (ex: ID de la vente ou de l'achat)
+  referenceId String?
+  notes       String?
+
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("StockMovementCreatedBy", fields: [createdById], references: [id])
+
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@index([productVariantId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([createdById])
+  @@map("stock_movement")
+}
+
+// Client
+model Client {
+  id       String  @id @default(uuid())
+  name     String
+  phone    String?
+  address  String?
+  email    String?
+  isActive Boolean @default(true)
+
+  // Dette totale
+  debtTotal Decimal @default(0) @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sales    Sale[]
+  payments ClientPayment[]
+
+  @@index([name])
+  @@index([phone])
+  @@index([isActive])
+  @@map("client")
+}
+
+// Vente
+model Sale {
+  id         String     @id @default(uuid())
+  saleNumber String     @unique // Auto-généré (ex: "VT-2026-0001")
+  clientId   String?
+  status     SaleStatus @default(UNPAID)
+
+  // Montants
+  totalAmount Decimal @db.Decimal(10, 2)
+  amountPaid  Decimal @default(0) @db.Decimal(10, 2)
+
+  notes String?
+
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("SaleCreatedBy", fields: [createdById], references: [id])
+  updatedAt   DateTime @updatedAt
+
+  client Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  items  SaleItem[]
+
+  @@index([saleNumber])
+  @@index([clientId])
+  @@index([status])
+  @@index([createdById])
+  @@index([createdAt])
+  @@map("sale")
+}
+
+// Ligne de vente
+model SaleItem {
+  id               String @id @default(uuid())
+  saleId           String
+  productVariantId String
+
+  // Quantité en demi-casiers
+  quantityHalf Int
+
+  // Prix unitaire (par demi-casier) au moment de la vente
+  unitPrice Decimal @db.Decimal(10, 2)
+
+  // Sous-total = quantityHalf * unitPrice
+  subtotal Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  sale           Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@index([saleId])
+  @@index([productVariantId])
+  @@map("sale_item")
+}
+
+// Paiement client
+model ClientPayment {
+  id          String   @id @default(uuid())
+  clientId    String
+  amount      Decimal  @db.Decimal(10, 2)
+  method      String? // "Espèces", "Mobile Money", "Virement"
+  reference   String? // Numéro de transaction
+  notes       String?
+  paymentDate DateTime @default(now())
+
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("ClientPaymentCreatedBy", fields: [createdById], references: [id])
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([createdById])
+  @@index([paymentDate])
+  @@map("client_payment")
+}
+
+// Dépenses
+model Expense {
+  id          String  @id @default(uuid())
+  category    String // "Transport", "Salaire", "Électricité"
+  description String
+  amount      Decimal @db.Decimal(10, 2)
+
+  expenseDate DateTime @default(now())
+
+  createdAt   DateTime @default(now())
+  createdById String
+  createdBy   User     @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+
+  @@index([category])
+  @@index([expenseDate])
+  @@index([createdById])
+  @@map("expense")
 }

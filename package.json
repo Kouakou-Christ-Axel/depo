@@ -12,7 +12,9 @@
     "format:fix": "prettier --write --list-different .",
     "db:generate": "bunx --bun prisma generate",
     "db:push": "bunx --bun prisma db push",
+    "db:migrate": "bunx --bun prisma migrate dev",
     "db:studio": "bunx --bun prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
     "prepare": "husky"
   },
   "dependencies": {
@@ -55,5 +57,8 @@
     "*.{json,css,md}": [
       "prettier --write"
     ]
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
