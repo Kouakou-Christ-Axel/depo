@@ -1,4 +1,4 @@
-import { Product, ProductVariant, Variant } from '@/generated/prisma';
+import { Product, ProductVariant, Variant } from '@/generated/prisma/client';
 
 export type ProductWithVariants = Product & {
   variants: (ProductVariant & {

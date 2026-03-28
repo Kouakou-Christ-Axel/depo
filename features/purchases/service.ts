@@ -1,8 +1,8 @@
 import prisma from '@/lib/prisma';
 import { CreatePurchaseInput } from './schemas/createPurchase.schema';
 import { CreatePurchaseResult, PurchaseWithDetails } from './types';
-import { StockMovementType } from '@/generated/prisma';
-import { Decimal } from '@prisma/client-runtime-utils';
+import { StockMovementType } from '@/generated/prisma/client';
+import { Decimal } from '@prisma/client/runtime/client';
 
 /**
  * Créer un achat fournisseur
@@ -96,43 +96,91 @@ export async function createPurchase(
   });
 }
 
+export interface ListPurchasesParams {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  productVariantId?: string;
+  supplierName?: string;
+}
+
+export interface PaginatedPurchases {
+  data: PurchaseWithDetails[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+}
+
 /**
- * Lister tous les achats avec détails
+ * Lister tous les achats avec détails (paginé + filtres)
  */
 export async function listPurchases(
-  limit = 50,
-  offset = 0
-): Promise<PurchaseWithDetails[]> {
-  return prisma.purchase.findMany({
-    take: limit,
-    skip: offset,
-    orderBy: { createdAt: 'desc' },
-    include: {
-      productVariant: {
-        include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
+  params: ListPurchasesParams = {}
+): Promise<PaginatedPurchases> {
+  const { page = 1, perPage = 20, search, productVariantId, supplierName } = params;
+  const skip = (page - 1) * perPage;
+
+  const where: Record<string, unknown> = {};
+
+  if (productVariantId) {
+    where.productVariantId = productVariantId;
+  }
+
+  if (supplierName) {
+    where.supplierName = { contains: supplierName, mode: 'insensitive' };
+  }
+
+  if (search) {
+    where.OR = [
+      { supplierName: { contains: search, mode: 'insensitive' } },
+      { invoiceNumber: { contains: search, mode: 'insensitive' } },
+      { productVariant: { product: { name: { contains: search, mode: 'insensitive' } } } },
+    ];
+  }
+
+  const [data, total] = await Promise.all([
+    prisma.purchase.findMany({
+      where,
+      take: perPage,
+      skip,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        productVariant: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
-          },
-          variant: {
-            select: {
-              id: true,
-              name: true,
+            variant: {
+              select: {
+                id: true,
+                name: true,
+              },
             },
           },
         },
-      },
-      createdBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.purchase.count({ where }),
+  ]);
+
+  return {
+    data,
+    total,
+    page,
+    perPage,
+    totalPages: Math.ceil(total / perPage),
+  };
 }
 
 /**

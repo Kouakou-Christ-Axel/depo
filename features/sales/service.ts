@@ -1,8 +1,8 @@
 import prisma from '@/lib/prisma';
 import { CreateSaleInput } from './schemas/createSale.schema';
 import { CreateSaleResult, SaleWithDetails } from './types';
-import { SaleStatus, StockMovementType } from '@/generated/prisma';
-import { Decimal } from '@prisma/client-runtime-utils';
+import { SaleStatus, StockMovementType } from '@/generated/prisma/client';
+import { Decimal } from '@prisma/client/runtime/client';
 
 /**
  * Générer un numéro de vente unique (ex: VT-2026-0001)

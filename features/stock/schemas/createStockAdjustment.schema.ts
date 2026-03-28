@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { StockMovementType } from '@/generated/prisma';
+import { StockMovementType } from '@/generated/prisma/client';
 
 export const createStockAdjustmentSchema = z.object({
   productVariantId: z.string({

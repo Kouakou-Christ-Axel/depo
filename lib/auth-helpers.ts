@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { UserRole } from '@/generated/prisma';
+import { UserRole } from '@/generated/prisma/client';
 import { headers } from 'next/headers';
 
 /**

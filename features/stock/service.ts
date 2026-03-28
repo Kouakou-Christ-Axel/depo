@@ -1,6 +1,6 @@
 import prisma from '@/lib/prisma';
 import { CreateStockAdjustmentInput } from './schemas/createStockAdjustment.schema';
-import { StockMovementType } from '@/generated/prisma';
+import { StockMovementType } from '@/generated/prisma/client';
 
 /**
  * Créer un ajustement de stock manuel

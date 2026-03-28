@@ -4,7 +4,7 @@ import {
   CreateClientInput,
 } from './schemas/recordClientPayment.schema';
 import { RecordClientPaymentResult, ClientWithDetails } from './types';
-import { Decimal } from '@prisma/client-runtime-utils';
+import { Decimal } from '@prisma/client/runtime/client';
 
 /**
  * Enregistrer un paiement client

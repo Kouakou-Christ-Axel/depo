@@ -1,7 +1,7 @@
 'use server';
 
 import { requireAnyRole } from '@/lib/auth-helpers';
-import { UserRole } from '@/generated/prisma';
+import { UserRole } from '@/generated/prisma/client';
 import {
   createPurchaseSchema,
   CreatePurchaseInput,

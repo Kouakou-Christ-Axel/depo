@@ -1,5 +1,5 @@
+import { SaleStatus } from '@/generated/prisma/enums';
 import prisma from '@/lib/prisma';
-import { SaleStatus } from '@/generated/prisma';
 
 /**
  * Rapport de ventes par période

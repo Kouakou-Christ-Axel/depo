@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk npx:*)",
+      "Bash(npx shadcn@latest add button input label card separator avatar dropdown-menu badge table sheet tooltip --yes)",
+      "Bash(npx shadcn@latest add sidebar --yes)",
+      "Bash(rtk tsc:*)",
+      "Bash(rtk bunx:*)",
+      "Bash(bun add:*)",
+      "Bash(tsc --noEmit)",
+      "Bash(grep -rn \"from ''@prisma/client-runtime-utils''\" --include=\"*.ts\" --include=\"*.tsx\")"
+    ]
+  }
+}

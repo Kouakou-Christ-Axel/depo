@@ -1,7 +1,7 @@
 'use server';
 
 import { requireRole } from '@/lib/auth-helpers';
-import { UserRole } from '@/generated/prisma';
+import { UserRole } from '@/generated/prisma/enums';
 import {
   createVariantSchema,
   createProductSchema,
@@ -15,7 +15,7 @@ export async function createVariantAction(input: CreateVariantInput) {
     await requireRole(UserRole.ADMIN);
     const validatedInput = createVariantSchema.parse(input);
     const variant = await createVariant(validatedInput);
-    return { success: true, data: variant };
+    return { success: true, data: { id: variant.id } };
   } catch (error) {
     return {
       success: false,
@@ -29,7 +29,7 @@ export async function createProductAction(input: CreateProductInput) {
     await requireRole(UserRole.ADMIN);
     const validatedInput = createProductSchema.parse(input);
     const product = await createProduct(validatedInput);
-    return { success: true, data: product };
+    return { success: true, data: { id: product.id } };
   } catch (error) {
     return {
       success: false,

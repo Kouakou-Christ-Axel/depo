@@ -2,8 +2,10 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider   = "prisma-client"
+  output     = "../generated/prisma"
+  engineType = "client"
+  runtime    = "nodejs"
 }
 
 datasource db {
@@ -40,10 +42,10 @@ enum StockMovementType {
 // ====================================================
 
 model User {
-  id    String   @id @default(uuid())
-  email String   @unique
+  id    String    @id @default(uuid())
+  email String    @unique
   name  String?
-  role  UserRole @default(VENDEUR)
+  role  UserRole?
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -183,10 +185,31 @@ model ProductVariant {
   @@map("product_variant")
 }
 
+// Fournisseur
+model Supplier {
+  id       String  @id @default(uuid())
+  name     String  @unique
+  phone    String?
+  email    String?
+  address  String?
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases Purchase[]
+
+  @@index([name])
+  @@index([isActive])
+  @@map("supplier")
+}
+
 // Achat fournisseur
 model Purchase {
   id               String  @id @default(uuid())
   productVariantId String
+  supplierId       String?
+  supplier         Supplier? @relation(fields: [supplierId], references: [id])
   supplierName     String?
   invoiceNumber    String?
 
@@ -208,6 +231,7 @@ model Purchase {
   productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
 
   @@index([productVariantId])
+  @@index([supplierId])
   @@index([createdById])
   @@index([createdAt])
   @@map("purchase")

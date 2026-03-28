@@ -1,4 +1,4 @@
-import { Purchase, ProductVariant } from '@/generated/prisma';
+import { Purchase, ProductVariant } from '@/generated/prisma/client';
 
 export type PurchaseWithDetails = Purchase & {
   productVariant: ProductVariant & {

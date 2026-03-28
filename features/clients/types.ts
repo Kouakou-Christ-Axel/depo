@@ -1,16 +1,17 @@
-import { Client, ClientPayment } from '@/generated/prisma';
+import { Client, ClientPayment } from '@/generated/prisma/client';
+import { Decimal } from '@prisma/client/runtime/client';
 
 export type ClientWithDetails = Client & {
   sales: Array<{
     id: string;
     saleNumber: string;
-    totalAmount: number;
-    amountPaid: number;
+    totalAmount: Decimal;
+    amountPaid: Decimal;
     createdAt: Date;
   }>;
   payments: Array<{
     id: string;
-    amount: number;
+    amount: Decimal;
     paymentDate: Date;
   }>;
 };

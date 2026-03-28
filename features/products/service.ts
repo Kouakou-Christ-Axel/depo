@@ -4,7 +4,7 @@ import {
   CreateProductInput,
 } from './schemas/createProduct.schema';
 import { ProductWithVariants, ProductVariantWithDetails } from './types';
-import { Decimal } from '@prisma/client-runtime-utils';
+import { Decimal } from '@prisma/client/runtime/client';
 
 /**
  * Créer une variante globale (33cl, 66cl, etc.)

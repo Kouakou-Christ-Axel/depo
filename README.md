@@ -1,5 +1,7 @@
 # DEPO
 
+claude --resume 9f6f8db7-f198-4ba2-a1f9-c5005525ae1a
+
 DEPO est une application web simple et robuste dédiée à la gestion quotidienne d’un dépôt de boissons.
 
 Elle a été conçue pour répondre aux réalités du terrain :

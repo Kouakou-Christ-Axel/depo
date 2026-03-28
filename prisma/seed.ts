@@ -1,7 +1,9 @@
-import { PrismaClient, UserRole } from '@/generated/prisma';
-import { Decimal } from '@prisma/client-runtime-utils';
+import { PrismaClient, UserRole } from '@/generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Decimal } from '@prisma/client/runtime/client';
 
-const prisma = new PrismaClient();
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('🌱 Début du seed...');
