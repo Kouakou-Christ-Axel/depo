@@ -1,6 +1,5 @@
 import prisma from '@/lib/prisma';
 import { CreateSaleInput } from './schemas/createSale.schema';
-import { CreateSaleResult, SaleWithDetails } from './types';
 import { SaleStatus, StockMovementType } from '@/generated/prisma/client';
 import { Decimal } from '@prisma/client/runtime/client';
 
@@ -214,62 +213,111 @@ export async function createSale(input: CreateSaleInput, createdById: string) {
   });
 }
 
+export interface ListSalesParams {
+  page?: number;
+  perPage?: number;
+  search?: string;
+  status?: SaleStatus;
+  clientId?: string;
+}
+
+export interface PaginatedSales {
+  data: Array<{
+    id: string;
+    saleNumber: string;
+    status: SaleStatus;
+    totalAmount: string;
+    amountPaid: string;
+    notes: string | null;
+    createdAt: Date;
+    items: Array<{
+      id: string;
+      quantityHalf: number;
+      unitPrice: string;
+      subtotal: string;
+      productVariant: {
+        product: { id: string; name: string };
+        variant: { id: string; name: string };
+      };
+    }>;
+    client: { id: string; name: string; phone: string | null } | null;
+    createdBy: { id: string; name: string | null; email: string };
+  }>;
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+}
+
 /**
- * Lister toutes les ventes avec détails
+ * Lister toutes les ventes avec détails (paginé + filtres)
  */
 export async function listSales(
-  limit = 50,
-  offset = 0,
-  filters?: {
-    status?: SaleStatus;
-    clientId?: string;
+  params: ListSalesParams = {}
+): Promise<PaginatedSales> {
+  const { page = 1, perPage = 20, search, status, clientId } = params;
+  const skip = (page - 1) * perPage;
+
+  const where: Record<string, unknown> = {};
+
+  if (status) {
+    where.status = status;
   }
-) {
-  return prisma.sale.findMany({
-    take: limit,
-    skip: offset,
-    where: {
-      status: filters?.status,
-      clientId: filters?.clientId,
-    },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      items: {
-        include: {
-          productVariant: {
-            include: {
-              product: {
-                select: {
-                  id: true,
-                  name: true,
-                },
-              },
-              variant: {
-                select: {
-                  id: true,
-                  name: true,
-                },
+
+  if (clientId) {
+    where.clientId = clientId;
+  }
+
+  if (search) {
+    where.OR = [
+      { saleNumber: { contains: search, mode: 'insensitive' } },
+      { client: { name: { contains: search, mode: 'insensitive' } } },
+    ];
+  }
+
+  const [data, total] = await Promise.all([
+    prisma.sale.findMany({
+      where,
+      take: perPage,
+      skip,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        items: {
+          include: {
+            productVariant: {
+              include: {
+                product: { select: { id: true, name: true } },
+                variant: { select: { id: true, name: true } },
               },
             },
           },
         },
+        client: { select: { id: true, name: true, phone: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
       },
-      client: {
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-        },
-      },
-      createdBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-  });
+    }),
+    prisma.sale.count({ where }),
+  ]);
+
+  // Serialize Decimals to strings
+  const serialized = data.map((sale) => ({
+    ...sale,
+    totalAmount: sale.totalAmount.toString(),
+    amountPaid: sale.amountPaid.toString(),
+    items: sale.items.map((item) => ({
+      ...item,
+      unitPrice: item.unitPrice.toString(),
+      subtotal: item.subtotal.toString(),
+    })),
+  }));
+
+  return {
+    data: serialized,
+    total,
+    page,
+    perPage,
+    totalPages: Math.ceil(total / perPage),
+  };
 }
 
 /**

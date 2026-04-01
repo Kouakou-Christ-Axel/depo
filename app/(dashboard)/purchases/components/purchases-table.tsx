@@ -24,7 +24,10 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Eye,
 } from "lucide-react";
+import { useState } from "react";
+import { PurchaseDetailDialog } from "./purchase-detail-dialog";
 
 type PurchaseRow = {
   id: string;
@@ -100,6 +103,23 @@ const columns: ColumnDef<PurchaseRow>[] = [
   },
 ];
 
+function makeColumns(onView: (row: PurchaseRow) => void): ColumnDef<PurchaseRow>[] {
+  return [
+    ...columns,
+    {
+      id: "actions",
+      header: () => <div className="text-right">Action</div>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView(row.original)}>
+            <Eye className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+}
+
 interface PaginatedResponse {
   data: Array<{
     id: string;
@@ -127,6 +147,7 @@ export function PurchasesTable() {
     "search",
     parseAsString.withDefault("")
   );
+  const [selectedPurchase, setSelectedPurchase] = useState<PurchaseRow | null>(null);
 
   const { data: response, isLoading } = useQuery({
     queryKey: ["purchases", page, search],
@@ -154,9 +175,11 @@ export function PurchasesTable() {
     createdAt: p.createdAt,
   }));
 
+  const columnsWithActions = makeColumns(setSelectedPurchase);
+
   const table = useReactTable({
     data: rows,
-    columns,
+    columns: columnsWithActions,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     pageCount: response?.totalPages ?? 0,
@@ -172,6 +195,7 @@ export function PurchasesTable() {
   }
 
   return (
+    <>
     <div className="space-y-4">
       <Input
         placeholder="Rechercher par fournisseur, facture ou produit..."
@@ -218,7 +242,7 @@ export function PurchasesTable() {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={columnsWithActions.length}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Aucun achat trouvé.
@@ -276,5 +300,12 @@ export function PurchasesTable() {
         </div>
       </div>
     </div>
+
+    <PurchaseDetailDialog
+      purchase={selectedPurchase}
+      open={!!selectedPurchase}
+      onClose={() => setSelectedPurchase(null)}
+    />
+    </>
   );
 }

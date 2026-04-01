@@ -25,7 +25,10 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Eye,
 } from "lucide-react";
+import { useState } from "react";
+import { SupplierDetailDialog } from "./supplier-detail-dialog";
 
 type SupplierRow = {
   id: string;
@@ -71,6 +74,23 @@ const columns: ColumnDef<SupplierRow>[] = [
   },
 ];
 
+function makeColumns(onView: (row: SupplierRow) => void): ColumnDef<SupplierRow>[] {
+  return [
+    ...columns,
+    {
+      id: "actions",
+      header: () => <div className="text-right">Action</div>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView(row.original)}>
+            <Eye className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+}
+
 interface PaginatedResponse {
   data: SupplierRow[];
   total: number;
@@ -85,6 +105,7 @@ export function SuppliersTable() {
     "search",
     parseAsString.withDefault("")
   );
+  const [selected, setSelected] = useState<SupplierRow | null>(null);
 
   const { data: response, isLoading } = useQuery({
     queryKey: ["suppliers", page, search],
@@ -100,9 +121,11 @@ export function SuppliersTable() {
     },
   });
 
+  const columnsWithActions = makeColumns(setSelected);
+
   const table = useReactTable({
     data: response?.data ?? [],
-    columns,
+    columns: columnsWithActions,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     pageCount: response?.totalPages ?? 0,
@@ -118,6 +141,7 @@ export function SuppliersTable() {
   }
 
   return (
+    <>
     <div className="space-y-4">
       <Input
         placeholder="Rechercher un fournisseur..."
@@ -164,7 +188,7 @@ export function SuppliersTable() {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={columnsWithActions.length}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Aucun fournisseur trouvé.
@@ -196,5 +220,11 @@ export function SuppliersTable() {
         </div>
       </div>
     </div>
+    <SupplierDetailDialog
+      supplier={selected}
+      open={!!selected}
+      onClose={() => setSelected(null)}
+    />
+    </>
   );
 }

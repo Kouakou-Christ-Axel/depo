@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { getDashboard } from "@/features/reports/service";
-import { listProducts } from "@/features/products/service";
 import { getProductsLowStock } from "@/features/products/service";
+import { getClientsDebtReport } from "@/features/reports/service";
 import {
   Card,
   CardContent,
@@ -9,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -22,27 +24,29 @@ import {
   Warehouse,
   Users,
   AlertTriangle,
-  TrendingUp,
   Banknote,
+  HandCoins,
 } from "lucide-react";
 
 function serialize<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data, (_key, value) =>
-    typeof value === "object" && value !== null && "toFixed" in value
-      ? Number(value)
-      : value
-  ));
+  return JSON.parse(
+    JSON.stringify(data, (_key, value) =>
+      typeof value === "object" && value !== null && "toFixed" in value
+        ? Number(value)
+        : value
+    )
+  );
 }
 
 export default async function DashboardPage() {
-  const [dashboard, rawProducts, rawLowStock] = await Promise.all([
+  const [dashboard, rawLowStock, rawDebtReport] = await Promise.all([
     getDashboard(),
-    listProducts(),
     getProductsLowStock(),
+    getClientsDebtReport(),
   ]);
 
-  const products = serialize(rawProducts);
   const lowStock = serialize(rawLowStock);
+  const debtReport = serialize(rawDebtReport);
 
   const stats = [
     {
@@ -50,28 +54,24 @@ export default async function DashboardPage() {
       value: `${dashboard.salesThisMonth.totalSales.toLocaleString("fr-FR")} FCFA`,
       description: `${dashboard.salesThisMonth.salesCount} vente(s) ce mois`,
       icon: ShoppingCart,
-      variant: "default" as const,
     },
     {
       title: "Montant encaissé",
       value: `${dashboard.salesThisMonth.totalPaid.toLocaleString("fr-FR")} FCFA`,
       description: `${dashboard.salesThisMonth.totalUnpaid.toLocaleString("fr-FR")} FCFA impayé`,
       icon: Banknote,
-      variant: "default" as const,
     },
     {
       title: "Valeur du stock",
       value: `${Math.round(dashboard.stock.totalValue).toLocaleString("fr-FR")} FCFA`,
       description: `${dashboard.stock.totalProducts} produit(s) actif(s)`,
       icon: Warehouse,
-      variant: "default" as const,
     },
     {
       title: "Dettes clients",
       value: `${dashboard.debts.totalDebt.toLocaleString("fr-FR")} FCFA`,
       description: `${dashboard.debts.clientsWithDebt} client(s) endetté(s)`,
       icon: Users,
-      variant: "default" as const,
     },
   ];
 
@@ -105,16 +105,74 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        {/* Debt recovery */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <HandCoins className="h-4 w-4 text-destructive" />
+                Recouvrement
+              </CardTitle>
+              <CardDescription>
+                {debtReport.summary.clientsWithDebt} client(s) endetté(s) —{" "}
+                {debtReport.summary.totalDebt.toLocaleString("fr-FR")} FCFA
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/clients?dette=true">Voir tout</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {debtReport.clients.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                Aucune dette en cours
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Client</TableHead>
+                    <TableHead className="text-right">Dette</TableHead>
+                    <TableHead className="text-right">Ventes impayées</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {debtReport.clients.slice(0, 8).map((client) => (
+                    <TableRow key={client.id}>
+                      <TableCell className="font-medium">
+                        {client.name}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="destructive">
+                          {Number(client.debtTotal).toLocaleString("fr-FR")} FCFA
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {client.sales.length}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Low stock alerts */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-              Alertes stock bas
-            </CardTitle>
-            <CardDescription>
-              Produits en dessous du seuil d&apos;alerte
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                Alertes stock bas
+              </CardTitle>
+              <CardDescription>
+                Produits en dessous du seuil de sécurité
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/products">Voir tout</Link>
+            </Button>
           </CardHeader>
           <CardContent>
             {lowStock.length === 0 ? (
@@ -140,55 +198,6 @@ export default async function DashboardPage() {
                       <TableCell className="text-right">
                         <Badge variant="destructive">
                           {(item.stockHalf / 2).toFixed(1)} casiers
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Products overview */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Produits
-            </CardTitle>
-            <CardDescription>
-              {products.length} produit(s) au catalogue
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {products.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                Aucun produit enregistré
-              </p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nom</TableHead>
-                    <TableHead className="text-right">Variantes</TableHead>
-                    <TableHead className="text-right">Statut</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.slice(0, 10).map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">
-                        {product.name}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {product.variants.length}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge
-                          variant={product.isActive ? "default" : "secondary"}
-                        >
-                          {product.isActive ? "Actif" : "Inactif"}
                         </Badge>
                       </TableCell>
                     </TableRow>

@@ -30,7 +30,7 @@ const formSchema = z.object({
         sellingPriceCasier: z
           .number()
           .positive("Le prix doit être positif"),
-        alertThresholdHalf: z.number().int().min(0),
+        alertThresholdCasier: z.number().min(0),
       })
     )
     .min(1, "Au moins une variante est requise"),
@@ -66,7 +66,7 @@ export function CreateProductForm() {
       name: "",
       description: "",
       variants: [
-        { variantId: "", casierSize: 12, sellingPriceCasier: 0, alertThresholdHalf: 10 },
+        { variantId: "", casierSize: 12, sellingPriceCasier: 0, alertThresholdCasier: 10 },
       ],
     },
   });
@@ -82,8 +82,10 @@ export function CreateProductForm() {
       name: data.name,
       description: data.description || undefined,
       variants: data.variants.map((v) => ({
-        ...v,
+        variantId: v.variantId,
         casierSize: v.casierSize as 12 | 24,
+        sellingPriceCasier: v.sellingPriceCasier,
+        alertThresholdHalf: Math.round((v.alertThresholdCasier || 5) * 2),
       })),
     });
 
@@ -140,7 +142,7 @@ export function CreateProductForm() {
                     variantId: "",
                     casierSize: 12,
                     sellingPriceCasier: 0,
-                    alertThresholdHalf: 10,
+                    alertThresholdCasier: 5,
                   })
                 }
               >
@@ -158,83 +160,101 @@ export function CreateProductForm() {
             {fields.map((field, index) => (
               <div
                 key={field.id}
-                className="grid grid-cols-[1fr_auto_1fr_auto] gap-2 items-end"
+                className="rounded-lg border p-3 space-y-2"
               >
-                <div>
-                  {index === 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Variante {index + 1}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => remove(index)}
+                    disabled={fields.length <= 1}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
                     <Label className="text-xs text-muted-foreground">
                       Taille
                     </Label>
-                  )}
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
-                    {...register(`variants.${index}.variantId`)}
-                    disabled={variantsLoading}
-                  >
-                    <option value="">
-                      {variantsLoading ? "Chargement..." : "Choisir..."}
-                    </option>
-                    {variants.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name}
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                      {...register(`variants.${index}.variantId`)}
+                      disabled={variantsLoading}
+                    >
+                      <option value="">
+                        {variantsLoading ? "Chargement..." : "Choisir..."}
                       </option>
-                    ))}
-                  </select>
-                  {errors.variants?.[index]?.variantId && (
-                    <p className="text-xs text-destructive">
-                      {errors.variants[index].variantId.message}
-                    </p>
-                  )}
-                </div>
+                      {variants.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.variants?.[index]?.variantId && (
+                      <p className="text-xs text-destructive">
+                        {errors.variants[index].variantId.message}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  {index === 0 && (
+                  <div>
                     <Label className="text-xs text-muted-foreground">
                       Casier
                     </Label>
-                  )}
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
-                    {...register(`variants.${index}.casierSize`, {
-                      valueAsNumber: true,
-                    })}
-                  >
-                    <option value={12}>12 btl</option>
-                    <option value={24}>24 btl</option>
-                  </select>
+                    <select
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                      {...register(`variants.${index}.casierSize`, {
+                        valueAsNumber: true,
+                      })}
+                    >
+                      <option value={12}>12 bouteilles</option>
+                      <option value={24}>24 bouteilles</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  {index === 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
                     <Label className="text-xs text-muted-foreground">
-                      Prix/casier (FCFA)
+                      Prix de vente / casier (FCFA)
                     </Label>
-                  )}
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="Prix"
-                    {...register(`variants.${index}.sellingPriceCasier`, {
-                      valueAsNumber: true,
-                    })}
-                  />
-                  {errors.variants?.[index]?.sellingPriceCasier && (
-                    <p className="text-xs text-destructive">
-                      {errors.variants[index].sellingPriceCasier.message}
-                    </p>
-                  )}
-                </div>
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="Ex: 8000"
+                      {...register(`variants.${index}.sellingPriceCasier`, {
+                        valueAsNumber: true,
+                      })}
+                    />
+                    {errors.variants?.[index]?.sellingPriceCasier && (
+                      <p className="text-xs text-destructive">
+                        {errors.variants[index].sellingPriceCasier.message}
+                      </p>
+                    )}
+                  </div>
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9"
-                  onClick={() => remove(index)}
-                  disabled={fields.length <= 1}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">
+                      Stock de sécurité (casiers)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.5}
+                      placeholder="Ex: 5"
+                      {...register(`variants.${index}.alertThresholdCasier`, {
+                        valueAsNumber: true,
+                      })}
+                    />
+                  </div>
+                </div>
               </div>
             ))}
           </div>

@@ -8,7 +8,8 @@
       "Bash(rtk bunx:*)",
       "Bash(bun add:*)",
       "Bash(tsc --noEmit)",
-      "Bash(grep -rn \"from ''@prisma/client-runtime-utils''\" --include=\"*.ts\" --include=\"*.tsx\")"
+      "Bash(grep -rn \"from ''@prisma/client-runtime-utils''\" --include=\"*.ts\" --include=\"*.tsx\")",
+      "Bash(npx shadcn@latest add dialog --yes)"
     ]
   }
 }

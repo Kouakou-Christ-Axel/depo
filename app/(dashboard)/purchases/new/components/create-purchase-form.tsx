@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createPurchaseAction } from "@/features/purchases/actions/createPurchase.action";
+import { createSupplierAction } from "@/features/suppliers/actions/supplier.action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Receipt } from "lucide-react";
+import { Loader2, Receipt, Building2 } from "lucide-react";
 import { useState } from "react";
 
 const formSchema = z.object({
@@ -65,6 +66,9 @@ export function CreatePurchaseForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState("");
+  const [newSupplier, setNewSupplier] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState("");
+  const [newSupplierPhone, setNewSupplierPhone] = useState("");
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products"],
@@ -110,18 +114,31 @@ export function CreatePurchaseForm() {
   );
   const total = quantity && price ? quantity * price : 0;
 
-  // Find supplier name for the action
   const selectedSupplierId = watch("supplierId");
   const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId);
 
   async function onSubmit(data: FormValues) {
     setServerError("");
 
+    // Create inline supplier if needed
+    let supplierName = selectedSupplier?.name;
+    if (newSupplier && newSupplierName.trim()) {
+      const supplierResult = await createSupplierAction({
+        name: newSupplierName.trim(),
+        phone: newSupplierPhone.trim() || undefined,
+      });
+      if (!supplierResult.success) {
+        setServerError(supplierResult.error ?? "Erreur création fournisseur");
+        return;
+      }
+      supplierName = newSupplierName.trim();
+    }
+
     const result = await createPurchaseAction({
       productVariantId: data.productVariantId,
       quantityCasier: data.quantityCasier,
       purchasePriceCasier: data.purchasePriceCasier,
-      supplierName: selectedSupplier?.name || undefined,
+      supplierName: supplierName || undefined,
       invoiceNumber: data.invoiceNumber || undefined,
       notes: data.notes || undefined,
     });
@@ -133,6 +150,7 @@ export function CreatePurchaseForm() {
 
     queryClient.invalidateQueries({ queryKey: ["purchases"] });
     queryClient.invalidateQueries({ queryKey: ["products"] });
+    queryClient.invalidateQueries({ queryKey: ["suppliers-all"] });
     router.push("/purchases");
   }
 
@@ -187,34 +205,69 @@ export function CreatePurchaseForm() {
 
           <Separator />
 
-          {/* Supplier & invoice */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="supplierId">Fournisseur</Label>
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
-                {...register("supplierId")}
-                disabled={suppliersLoading}
+          {/* Supplier */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Fournisseur</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setNewSupplier(!newSupplier)}
               >
-                <option value="">
-                  {suppliersLoading ? "Chargement..." : "Choisir..."}
-                </option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
+                <Building2 className="h-3 w-3 mr-1" />
+                {newSupplier ? "Fournisseur existant" : "Nouveau fournisseur"}
+              </Button>
+            </div>
+
+            {newSupplier ? (
+              <div className="grid gap-3 sm:grid-cols-2 rounded-lg border p-3">
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Nom *
+                  </Label>
+                  <Input
+                    placeholder="Nom du fournisseur"
+                    value={newSupplierName}
+                    onChange={(e) => setNewSupplierName(e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Téléphone
+                  </Label>
+                  <Input
+                    placeholder="+237 6XX XXX XXX"
+                    value={newSupplierPhone}
+                    onChange={(e) => setNewSupplierPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <select
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+                  {...register("supplierId")}
+                  disabled={suppliersLoading}
+                >
+                  <option value="">
+                    {suppliersLoading ? "Chargement..." : "Choisir..."}
                   </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="invoiceNumber">N° de facture</Label>
-              <Input
-                id="invoiceNumber"
-                placeholder="FAC-XXXX"
-                {...register("invoiceNumber")}
-              />
-            </div>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <Input
+                  placeholder="N° de facture"
+                  {...register("invoiceNumber")}
+                />
+              </div>
+            )}
           </div>
+
+          {!newSupplier && <div />}
 
           <Separator />
 

@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { DataTable } from "@/components/ui/data-table";
 import { columns, type ProductRow } from "./columns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ProductDetailDialog } from "./product-detail-dialog";
+import { useState, useMemo } from "react";
 
 async function fetchProducts(): Promise<ProductRow[]> {
   const res = await fetch("/api/products?includeInactive=true");
@@ -11,7 +13,6 @@ async function fetchProducts(): Promise<ProductRow[]> {
 
   const products = await res.json();
 
-  // Flatten: one row per product-variant
   return products.flatMap(
     (product: {
       id: string;
@@ -67,6 +68,13 @@ export function ProductsTable() {
     queryFn: fetchProducts,
   });
 
+  const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
+
+  const productRows = useMemo(() => {
+    if (!selectedProduct || !data) return [];
+    return data.filter((r) => r.productName === selectedProduct);
+  }, [selectedProduct, data]);
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -77,11 +85,20 @@ export function ProductsTable() {
   }
 
   return (
-    <DataTable
-      columns={columns}
-      data={data ?? []}
-      searchKey="productName"
-      searchPlaceholder="Rechercher un produit..."
-    />
+    <>
+      <DataTable
+        columns={columns}
+        data={data ?? []}
+        searchKey="productName"
+        searchPlaceholder="Rechercher un produit..."
+        onRowClick={(row) => setSelectedProduct(row.productName)}
+      />
+      <ProductDetailDialog
+        productName={selectedProduct}
+        rows={productRows}
+        open={!!selectedProduct}
+        onClose={() => setSelectedProduct(null)}
+      />
+    </>
   );
 }
