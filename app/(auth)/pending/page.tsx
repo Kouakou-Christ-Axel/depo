@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
@@ -10,10 +11,22 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Beer, Clock, LogOut } from "lucide-react";
+import { Beer, Clock, LogOut, RefreshCw } from "lucide-react";
 
 export default function PendingPage() {
   const router = useRouter();
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const { data } = await authClient.getSession();
+      const user = data?.user as { role?: string } | undefined;
+      if (user?.role) {
+        router.replace("/");
+      }
+    }, 30_000);
+
+    return () => clearInterval(interval);
+  }, [router]);
 
   async function handleSignOut() {
     await authClient.signOut();
@@ -30,16 +43,23 @@ export default function PendingPage() {
           <CardTitle className="text-xl">Compte en attente</CardTitle>
           <CardDescription>
             Votre compte a bien été créé mais un administrateur doit vous
-            attribuer un rôle avant que vous puissiez accéder à l&apos;application.
+            attribuer un rôle avant que vous puissiez accéder à
+            l&apos;application.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-lg border bg-muted/50 p-4">
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Beer className="h-4 w-4" />
-              <span>Contactez votre administrateur pour obtenir l&apos;accès.</span>
+              <span>
+                Contactez votre administrateur pour obtenir l&apos;accès.
+              </span>
             </div>
           </div>
+          <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <RefreshCw className="h-3 w-3 animate-spin" />
+            Vérification automatique toutes les 30 secondes
+          </p>
           <Button variant="outline" onClick={handleSignOut} className="w-full">
             <LogOut className="mr-2 h-4 w-4" />
             Se déconnecter
