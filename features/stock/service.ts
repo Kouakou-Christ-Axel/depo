@@ -87,51 +87,111 @@ export async function createStockAdjustment(
   });
 }
 
+export interface ListStockMovementsParams {
+  page?: number;
+  perPage?: number;
+  type?: StockMovementType;
+  search?: string;
+}
+
 /**
- * Lister les mouvements de stock
+ * Lister les mouvements de stock (paginé)
  */
-export async function listStockMovements(
-  limit = 50,
-  offset = 0,
-  filters?: {
-    productVariantId?: string;
-    type?: StockMovementType;
+export async function listStockMovements(params: ListStockMovementsParams = {}) {
+  const { page = 1, perPage = 20, type, search } = params;
+  const skip = (page - 1) * perPage;
+
+  const where: Record<string, unknown> = {};
+  if (type) where.type = type;
+  if (search) {
+    where.OR = [
+      { productVariant: { product: { name: { contains: search, mode: 'insensitive' } } } },
+      { notes: { contains: search, mode: 'insensitive' } },
+    ];
   }
-) {
-  return await prisma.stockMovement.findMany({
-    take: limit,
-    skip: offset,
-    where: {
-      productVariantId: filters?.productVariantId,
-      type: filters?.type,
-    },
-    include: {
-      productVariant: {
-        include: {
-          product: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          variant: {
-            select: {
-              id: true,
-              name: true,
-            },
+
+  const [data, total] = await Promise.all([
+    prisma.stockMovement.findMany({
+      where,
+      take: perPage,
+      skip,
+      include: {
+        productVariant: {
+          include: {
+            product: { select: { id: true, name: true } },
+            variant: { select: { id: true, name: true } },
           },
         },
+        createdBy: { select: { id: true, name: true, email: true } },
       },
-      createdBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.stockMovement.count({ where }),
+  ]);
+
+  return {
+    data: data.map((m) => ({
+      id: m.id,
+      type: m.type,
+      quantityHalf: m.quantityHalf,
+      stockAfter: m.stockAfter,
+      notes: m.notes,
+      createdAt: m.createdAt.toISOString(),
+      productName: m.productVariant.product.name,
+      variantName: m.productVariant.variant.name,
+      createdByName: m.createdBy.name || m.createdBy.email,
+    })),
+    total,
+    page,
+    perPage,
+    totalPages: Math.ceil(total / perPage),
+  };
+}
+
+/**
+ * Statistiques de stock
+ */
+export async function getStockStats() {
+  const [variants, movements] = await Promise.all([
+    prisma.productVariant.findMany({
+      where: { isActive: true, product: { isActive: true } },
+      include: { product: true, variant: true },
+    }),
+    prisma.stockMovement.groupBy({
+      by: ['type'],
+      _sum: { quantityHalf: true },
+      _count: true,
+    }),
+  ]);
+
+  const totalStockCasier = variants.reduce((s, v) => s + v.stockHalf / 2, 0);
+  const totalValue = variants.reduce(
+    (s, v) => s + (v.stockHalf / 2) * Number(v.averageCostCasier),
+    0
+  );
+  const lowStockCount = variants.filter(
+    (v) => v.stockHalf <= v.alertThresholdHalf
+  ).length;
+  const outOfStockCount = variants.filter((v) => v.stockHalf === 0).length;
+
+  const movementsByType = Object.fromEntries(
+    movements.map((m) => [
+      m.type,
+      { count: m._count, totalHalf: m._sum.quantityHalf ?? 0 },
+    ])
+  );
+
+  return {
+    totalProducts: variants.length,
+    totalStockCasier,
+    totalValue,
+    lowStockCount,
+    outOfStockCount,
+    movements: movementsByType as Record<
+      string,
+      { count: number; totalHalf: number }
+    >,
+  };
 }
 
 /**

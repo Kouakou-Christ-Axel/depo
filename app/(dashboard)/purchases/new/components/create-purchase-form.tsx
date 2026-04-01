@@ -5,8 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { createPurchaseAction } from "@/features/purchases/actions/createPurchase.action";
-import { createSupplierAction } from "@/features/suppliers/actions/supplier.action";
+import { useCreatePurchase, useCreateSupplier } from "@/hooks/use-mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,11 +63,13 @@ async function fetchSuppliers(): Promise<SupplierOption[]> {
 
 export function CreatePurchaseForm() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState("");
   const [newSupplier, setNewSupplier] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState("");
   const [newSupplierPhone, setNewSupplierPhone] = useState("");
+
+  const purchaseMutation = useCreatePurchase();
+  const supplierMutation = useCreateSupplier();
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
     queryKey: ["products"],
@@ -117,41 +118,33 @@ export function CreatePurchaseForm() {
   const selectedSupplierId = watch("supplierId");
   const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId);
 
+  const isPending = purchaseMutation.isPending || supplierMutation.isPending;
+
   async function onSubmit(data: FormValues) {
     setServerError("");
-
-    // Create inline supplier if needed
-    let supplierName = selectedSupplier?.name;
-    if (newSupplier && newSupplierName.trim()) {
-      const supplierResult = await createSupplierAction({
-        name: newSupplierName.trim(),
-        phone: newSupplierPhone.trim() || undefined,
-      });
-      if (!supplierResult.success) {
-        setServerError(supplierResult.error ?? "Erreur création fournisseur");
-        return;
+    try {
+      let supplierName = selectedSupplier?.name;
+      if (newSupplier && newSupplierName.trim()) {
+        await supplierMutation.mutateAsync({
+          name: newSupplierName.trim(),
+          phone: newSupplierPhone.trim() || undefined,
+        });
+        supplierName = newSupplierName.trim();
       }
-      supplierName = newSupplierName.trim();
+
+      await purchaseMutation.mutateAsync({
+        productVariantId: data.productVariantId,
+        quantityCasier: data.quantityCasier,
+        purchasePriceCasier: data.purchasePriceCasier,
+        supplierName: supplierName || undefined,
+        invoiceNumber: data.invoiceNumber || undefined,
+        notes: data.notes || undefined,
+      });
+
+      router.push("/purchases");
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Erreur");
     }
-
-    const result = await createPurchaseAction({
-      productVariantId: data.productVariantId,
-      quantityCasier: data.quantityCasier,
-      purchasePriceCasier: data.purchasePriceCasier,
-      supplierName: supplierName || undefined,
-      invoiceNumber: data.invoiceNumber || undefined,
-      notes: data.notes || undefined,
-    });
-
-    if (!result.success) {
-      setServerError(result.error ?? "Erreur lors de la création");
-      return;
-    }
-
-    queryClient.invalidateQueries({ queryKey: ["purchases"] });
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-    queryClient.invalidateQueries({ queryKey: ["suppliers-all"] });
-    router.push("/purchases");
   }
 
   return (
@@ -335,7 +328,7 @@ export function CreatePurchaseForm() {
             <p className="text-sm text-destructive">{serverError}</p>
           )}
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Button type="submit" className="w-full" disabled={isPending}>
             {isSubmitting && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}

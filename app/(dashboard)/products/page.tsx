@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Package, Plus } from "lucide-react";
 import { ProductsTable } from "./components/products-table";
+import { PermissionGate } from "@/components/permission-gate";
 
 export default function ProductsPage() {
   return (
@@ -20,12 +21,14 @@ export default function ProductsPage() {
             Gérez vos produits et leurs variantes
           </p>
         </div>
-        <Button asChild>
-          <Link href="/products/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau produit
-          </Link>
-        </Button>
+        <PermissionGate action="create" subject="Product">
+          <Button asChild>
+            <Link href="/products/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nouveau produit
+            </Link>
+          </Button>
+        </PermissionGate>
       </div>
 
       <Card>

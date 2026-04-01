@@ -1,10 +1,9 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { createVariantAction } from "@/features/products/actions/createProduct.action";
+import { useCreateVariant } from "@/hooks/use-mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,9 +26,9 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export function CreateVariantForm() {
-  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState("");
   const [success, setSuccess] = useState(false);
+  const variantMutation = useCreateVariant();
 
   const {
     register,
@@ -48,22 +47,18 @@ export function CreateVariantForm() {
   async function onSubmit(data: FormValues) {
     setServerError("");
     setSuccess(false);
-
-    const result = await createVariantAction({
-      name: data.name,
-      sizeInMl: data.sizeInMl,
-      description: data.description || undefined,
-    });
-
-    if (!result.success) {
-      setServerError(result.error ?? "Erreur lors de la création");
-      return;
+    try {
+      await variantMutation.mutateAsync({
+        name: data.name,
+        sizeInMl: data.sizeInMl,
+        description: data.description || undefined,
+      });
+      reset();
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Erreur");
     }
-
-    reset();
-    setSuccess(true);
-    queryClient.invalidateQueries({ queryKey: ["variants"] });
-    setTimeout(() => setSuccess(false), 3000);
   }
 
   return (

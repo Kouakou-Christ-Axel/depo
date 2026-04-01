@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Truck, Plus } from "lucide-react";
 import { PurchasesTable } from "./components/purchases-table";
+import { PermissionGate } from "@/components/permission-gate";
 
 export default function PurchasesPage() {
   return (
@@ -20,12 +21,14 @@ export default function PurchasesPage() {
             Historique des achats fournisseurs
           </p>
         </div>
-        <Button asChild>
-          <Link href="/purchases/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouvel achat
-          </Link>
-        </Button>
+        <PermissionGate action="create" subject="Purchase">
+          <Button asChild>
+            <Link href="/purchases/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nouvel achat
+            </Link>
+          </Button>
+        </PermissionGate>
       </div>
 
       <Card>

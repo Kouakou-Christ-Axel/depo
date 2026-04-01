@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Building2, Plus } from "lucide-react";
 import { SuppliersTable } from "./components/suppliers-table";
+import { PermissionGate } from "@/components/permission-gate";
 
 export default function SuppliersPage() {
   return (
@@ -20,12 +21,14 @@ export default function SuppliersPage() {
             Gérez vos fournisseurs de boissons
           </p>
         </div>
-        <Button asChild>
-          <Link href="/suppliers/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau fournisseur
-          </Link>
-        </Button>
+        <PermissionGate action="create" subject="Supplier">
+          <Button asChild>
+            <Link href="/suppliers/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nouveau fournisseur
+            </Link>
+          </Button>
+        </PermissionGate>
       </div>
 
       <Card>

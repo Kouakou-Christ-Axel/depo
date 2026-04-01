@@ -3,12 +3,12 @@
 import { requireRole } from '@/lib/auth-helpers';
 import { UserRole } from '@/generated/prisma/enums';
 import {
-  createVariantSchema,
+  CreateProductInput,
   createProductSchema,
   CreateVariantInput,
-  CreateProductInput,
+  createVariantSchema,
 } from '../schemas/createProduct.schema';
-import { createVariant, createProduct } from '../service';
+import { createProduct, createVariant } from '../service';
 
 export async function createVariantAction(input: CreateVariantInput) {
   try {

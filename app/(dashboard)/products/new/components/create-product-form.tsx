@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { createProductAction } from "@/features/products/actions/createProduct.action";
+import { useCreateProduct } from "@/hooks/use-mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,8 +46,8 @@ async function fetchVariants() {
 
 export function CreateProductForm() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState("");
+  const productMutation = useCreateProduct();
 
   const { data: variants = [], isLoading: variantsLoading } = useQuery({
     queryKey: ["variants"],
@@ -78,25 +78,22 @@ export function CreateProductForm() {
 
   async function onSubmit(data: FormValues) {
     setServerError("");
-    const result = await createProductAction({
-      name: data.name,
-      description: data.description || undefined,
-      variants: data.variants.map((v) => ({
-        variantId: v.variantId,
-        casierSize: v.casierSize as 12 | 24,
-        sellingPriceCasier: v.sellingPriceCasier,
-        alertThresholdHalf: Math.round((v.alertThresholdCasier || 5) * 2),
-      })),
-    });
-
-    if (!result.success) {
-      setServerError(result.error ?? "Erreur lors de la création");
-      return;
+    try {
+      await productMutation.mutateAsync({
+        name: data.name,
+        description: data.description || undefined,
+        variants: data.variants.map((v) => ({
+          variantId: v.variantId,
+          casierSize: v.casierSize as 12 | 24,
+          sellingPriceCasier: v.sellingPriceCasier,
+          alertThresholdHalf: Math.round((v.alertThresholdCasier || 5) * 2),
+        })),
+      });
+      reset();
+      router.push("/products");
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Erreur");
     }
-
-    reset();
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-    router.push("/products");
   }
 
   return (

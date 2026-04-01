@@ -18,6 +18,8 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@casl/ability": "^6.8.0",
+    "@casl/react": "^5.0.1",
     "@hookform/resolvers": "^5.2.2",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
@@ -35,6 +37,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.72.0",
+    "recharts": "3.8.0",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

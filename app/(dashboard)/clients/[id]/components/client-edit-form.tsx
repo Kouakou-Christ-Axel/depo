@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { updateClientAction } from "@/features/clients/actions/updateClient.action";
+import { useUpdateClient } from "@/hooks/use-mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,19 +48,21 @@ export function ClientEditForm({ client, onSuccess }: ClientEditFormProps) {
     },
   });
 
+  const updateMutation = useUpdateClient(client.id);
+
   async function onSubmit(data: FormValues) {
     setServerError("");
-    const result = await updateClientAction(client.id, {
-      name: data.name,
-      phone: data.phone || undefined,
-      email: data.email || undefined,
-      address: data.address || undefined,
-    });
-    if (!result.success) {
-      setServerError(result.error ?? "Erreur");
-      return;
+    try {
+      await updateMutation.mutateAsync({
+        name: data.name,
+        phone: data.phone || undefined,
+        email: data.email || undefined,
+        address: data.address || undefined,
+      });
+      onSuccess();
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Erreur");
     }
-    onSuccess();
   }
 
   return (

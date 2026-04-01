@@ -1,12 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { createSaleAction } from "@/features/sales/actions/createSale.action";
-import { createClientAction } from "@/features/clients/actions/createClient.action";
+import { useCreateSale, useCreateClient } from "@/hooks/use-mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +17,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Loader2, ShoppingCart, UserPlus } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Loader2,
+  ShoppingCart,
+  UserPlus,
+  AlertTriangle,
+} from "lucide-react";
 import { useState, useMemo } from "react";
 
 const formSchema = z.object({
@@ -26,7 +32,9 @@ const formSchema = z.object({
     .array(
       z.object({
         productVariantId: z.string().min(1, "Choisissez un produit"),
-        quantityCasier: z.number().positive("Quantité requise (0.5 ou 1 casier min)"),
+        quantityCasier: z
+          .number()
+          .positive("Quantité requise (0.5 ou 1 casier min)"),
       })
     )
     .min(1, "Au moins un article"),
@@ -68,11 +76,13 @@ async function fetchClients(): Promise<ClientOption[]> {
 
 export function CreateSaleForm() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState("");
   const [newClient, setNewClient] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
+
+  const saleMutation = useCreateSale();
+  const clientMutation = useCreateClient();
 
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
@@ -92,6 +102,7 @@ export function CreateSaleForm() {
           productName: p.name,
           label: `${p.name} — ${v.variant.name} (stock: ${(v.stockHalf / 2).toFixed(1)} casiers)`,
           priceCasier: Number(v.sellingPriceCasier) || 0,
+          stockCasier: v.stockHalf / 2,
         }))
       ),
     [products]
@@ -101,7 +112,7 @@ export function CreateSaleForm() {
     register,
     handleSubmit,
     control,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -119,54 +130,80 @@ export function CreateSaleForm() {
 
   const watchedItems = useWatch({ control, name: "items" }) ?? [];
   const watchedAmountPaid = useWatch({ control, name: "amountPaid" }) ?? 0;
+  const watchedClientId = useWatch({ control, name: "clientId" });
+
+  // Stock validation per item
+  const stockErrors = useMemo(() => {
+    const errs: Record<number, string> = {};
+    for (let i = 0; i < watchedItems.length; i++) {
+      const item = watchedItems[i];
+      if (!item.productVariantId) continue;
+      const variant = productVariants.find(
+        (v) => v.id === item.productVariantId
+      );
+      if (!variant) continue;
+      const qty = item.quantityCasier || 0;
+      if (qty > variant.stockCasier) {
+        errs[i] =
+          `Stock insuffisant (${variant.stockCasier.toFixed(1)} casiers dispo)`;
+      }
+    }
+    return errs;
+  }, [watchedItems, productVariants]);
+
+  const hasStockErrors = Object.keys(stockErrors).length > 0;
 
   const total = watchedItems.reduce((sum, item) => {
-    const variant = productVariants.find((v) => v.id === item.productVariantId);
+    const variant = productVariants.find(
+      (v) => v.id === item.productVariantId
+    );
     if (!variant) return sum;
     return sum + variant.priceCasier * (item.quantityCasier || 0);
   }, 0);
 
   const remaining = total - (watchedAmountPaid || 0);
+  const isComptoir = !newClient && !watchedClientId;
+  const isCreditOnComptoir = isComptoir && total > 0 && remaining > 0;
+  const isPending = saleMutation.isPending || clientMutation.isPending;
 
   async function onSubmit(data: FormValues) {
     setServerError("");
 
-    // Create inline client if needed
-    let clientId = data.clientId || undefined;
-    if (newClient && newClientName.trim()) {
-      const clientResult = await createClientAction({
-        name: newClientName.trim(),
-        phone: newClientPhone.trim() || undefined,
-      });
-      if (!clientResult.success) {
-        setServerError(clientResult.error ?? "Erreur création client");
-        return;
-      }
-      clientId = clientResult.data!.id;
-    }
-
-    // Convert casiers to half-casiers for the API
-    const items = data.items.map((item) => ({
-      productVariantId: item.productVariantId,
-      quantityHalf: Math.round(item.quantityCasier * 2),
-    }));
-
-    const result = await createSaleAction({
-      items,
-      clientId,
-      amountPaid: data.amountPaid || 0,
-      notes: data.notes || undefined,
-    });
-
-    if (!result.success) {
-      setServerError(result.error ?? "Erreur lors de la création");
+    if (hasStockErrors) {
+      setServerError("Stock insuffisant pour un ou plusieurs articles");
       return;
     }
 
-    queryClient.invalidateQueries({ queryKey: ["sales"] });
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-    queryClient.invalidateQueries({ queryKey: ["clients-all"] });
-    router.push("/sales");
+    try {
+      // Create inline client if needed
+      let clientId = data.clientId || undefined;
+      if (newClient && newClientName.trim()) {
+        const newClientData = await clientMutation.mutateAsync({
+          name: newClientName.trim(),
+          phone: newClientPhone.trim() || undefined,
+        });
+        clientId = newClientData.id;
+      }
+
+      // Convert casiers to half-casiers for the API
+      const items = data.items.map((item) => ({
+        productVariantId: item.productVariantId,
+        quantityHalf: Math.round(item.quantityCasier * 2),
+      }));
+
+      await saleMutation.mutateAsync({
+        items,
+        clientId,
+        amountPaid: data.amountPaid || 0,
+        notes: data.notes || undefined,
+      });
+
+      router.push("/sales");
+    } catch (err) {
+      setServerError(
+        err instanceof Error ? err.message : "Erreur lors de la création"
+      );
+    }
   }
 
   return (
@@ -214,6 +251,7 @@ export function CreateSaleForm() {
               const lineTotal = selectedVariant
                 ? selectedVariant.priceCasier * qty
                 : 0;
+              const stockErr = stockErrors[index];
 
               return (
                 <div key={field.id} className="space-y-1">
@@ -253,12 +291,12 @@ export function CreateSaleForm() {
                         min={0.5}
                         step={0.5}
                         max={
-                          selectedVariant
-                            ? selectedVariant.stockHalf / 2
-                            : 999
+                          selectedVariant ? selectedVariant.stockCasier : 999
                         }
+                        className={stockErr ? "border-destructive" : ""}
                         {...register(`items.${index}.quantityCasier`, {
-                          setValueAs: (v: string) => (v === "" ? 0 : Number(v)),
+                          setValueAs: (v: string) =>
+                            v === "" ? 0 : Number(v),
                         })}
                       />
                     </div>
@@ -280,6 +318,12 @@ export function CreateSaleForm() {
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
+                  {stockErr && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      {stockErr}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -357,7 +401,9 @@ export function CreateSaleForm() {
                 id="amountPaid"
                 type="number"
                 min={0}
-                {...register("amountPaid", { setValueAs: (v: string) => (v === "" ? 0 : Number(v)) })}
+                {...register("amountPaid", {
+                  setValueAs: (v: string) => (v === "" ? 0 : Number(v)),
+                })}
               />
             </div>
 
@@ -389,6 +435,13 @@ export function CreateSaleForm() {
             />
           </div>
 
+          {isCreditOnComptoir && (
+            <p className="text-sm text-destructive flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Vente comptoir : le montant payé doit couvrir le total. Ajoutez un client pour autoriser le crédit.
+            </p>
+          )}
+
           {serverError && (
             <p className="text-sm text-destructive">{serverError}</p>
           )}
@@ -396,11 +449,9 @@ export function CreateSaleForm() {
           <Button
             type="submit"
             className="w-full"
-            disabled={isSubmitting || total === 0}
+            disabled={isPending || total === 0 || hasStockErrors || isCreditOnComptoir}
           >
-            {isSubmitting && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Enregistrer la vente
           </Button>
         </form>

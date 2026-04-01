@@ -1,10 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createSupplierAction } from "@/features/suppliers/actions/supplier.action";
+import { useCreateSupplier } from "@/hooks/use-mutations";
 import {
   createSupplierSchema,
   type CreateSupplierInput,
@@ -24,8 +23,8 @@ import { useState } from "react";
 
 export function CreateSupplierForm() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState("");
+  const supplierMutation = useCreateSupplier();
 
   const {
     register,
@@ -38,15 +37,12 @@ export function CreateSupplierForm() {
 
   async function onSubmit(data: CreateSupplierInput) {
     setServerError("");
-    const result = await createSupplierAction(data);
-
-    if (!result.success) {
-      setServerError(result.error ?? "Erreur lors de la création");
-      return;
+    try {
+      await supplierMutation.mutateAsync(data);
+      router.push("/suppliers");
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Erreur");
     }
-
-    queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-    router.push("/suppliers");
   }
 
   return (

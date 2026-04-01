@@ -2,10 +2,7 @@
 
 import { requireAnyRole } from '@/lib/auth-helpers';
 import { UserRole } from '@/generated/prisma/client';
-import {
-  createPurchaseSchema,
-  CreatePurchaseInput,
-} from '../schemas/createPurchase.schema';
+import { CreatePurchaseInput, createPurchaseSchema, } from '../schemas/createPurchase.schema';
 import { createPurchase } from '../service';
 
 /**
@@ -28,7 +25,9 @@ export async function createPurchaseAction(input: CreatePurchaseInput) {
 
     return {
       success: true,
-      data: result,
+      data: {
+        purchaseId: result.purchase.id,
+      },
     };
   } catch (error) {
     return {

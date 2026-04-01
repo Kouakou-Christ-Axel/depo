@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
@@ -9,7 +8,7 @@ import {
   createClientSchema,
   type CreateClientInput,
 } from "@/features/clients/schemas/recordClientPayment.schema";
-import { createClientAction } from "@/features/clients/actions/createClient.action";
+import { useCreateClient } from "@/hooks/use-mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,8 +24,8 @@ import { useState } from "react";
 
 export default function NewClientPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [serverError, setServerError] = useState("");
+  const clientMutation = useCreateClient();
 
   const {
     register,
@@ -39,13 +38,12 @@ export default function NewClientPage() {
 
   async function onSubmit(data: CreateClientInput) {
     setServerError("");
-    const result = await createClientAction(data);
-    if (!result.success) {
-      setServerError(result.error ?? "Erreur");
-      return;
+    try {
+      await clientMutation.mutateAsync(data);
+      router.push("/clients");
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Erreur");
     }
-    queryClient.invalidateQueries({ queryKey: ["clients-list"] });
-    router.push("/clients");
   }
 
   return (

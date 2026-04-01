@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Plus } from "lucide-react";
 import { SalesView } from "./components/sales-view";
+import { PermissionGate } from "@/components/permission-gate";
 
 export default function SalesPage() {
   return (
@@ -20,12 +21,14 @@ export default function SalesPage() {
             Historique des ventes et factures
           </p>
         </div>
-        <Button asChild>
-          <Link href="/sales/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouvelle vente
-          </Link>
-        </Button>
+        <PermissionGate action="create" subject="Sale">
+          <Button asChild>
+            <Link href="/sales/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nouvelle vente
+            </Link>
+          </Button>
+        </PermissionGate>
       </div>
 
       <Card>

@@ -29,7 +29,8 @@ export async function createSaleAction(input: CreateSaleInput) {
 
     return {
       success: true,
-      data: result,
+      // Keep Server Action payload JSON-safe for Client Components.
+      data: { saleId: result.sale.id },
     };
   } catch (error) {
     return {

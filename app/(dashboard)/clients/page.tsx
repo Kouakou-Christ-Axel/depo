@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Users, Plus } from "lucide-react";
 import { ClientsView } from "./components/clients-view";
+import { PermissionGate } from "@/components/permission-gate";
 
 export default function ClientsPage() {
   return (
@@ -20,12 +21,14 @@ export default function ClientsPage() {
             Gestion des clients et recouvrement des dettes
           </p>
         </div>
-        <Button asChild>
-          <Link href="/clients/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau client
-          </Link>
-        </Button>
+        <PermissionGate action="create" subject="Client">
+          <Button asChild>
+            <Link href="/clients/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nouveau client
+            </Link>
+          </Button>
+        </PermissionGate>
       </div>
 
       <Card>

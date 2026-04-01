@@ -34,11 +34,18 @@ import {
   Building2,
   LogOut,
   ChevronUp,
+  Shield,
+  type LucideIcon,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { useAbility } from "@/components/ability-provider";
+import { NAV_SUBJECT_MAP, type Subject } from "@/lib/permissions";
 
-const navItems = [
+const navItems: {
+  label: string;
+  items: { title: string; href: string; icon: LucideIcon }[];
+}[] = [
   {
     label: "Principal",
     items: [
@@ -63,6 +70,12 @@ const navItems = [
       { title: "Rapports", href: "/reports", icon: BarChart3 },
     ],
   },
+  {
+    label: "Administration",
+    items: [
+      { title: "Utilisateurs", href: "/users", icon: Shield },
+    ],
+  },
 ];
 
 interface AppSidebarProps {
@@ -76,6 +89,7 @@ interface AppSidebarProps {
 export function AppSidebar({ user }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const ability = useAbility();
 
   async function handleSignOut() {
     await authClient.signOut();
@@ -91,6 +105,18 @@ export function AppSidebar({ user }: AppSidebarProps) {
         .slice(0, 2)
     : user.email[0].toUpperCase();
 
+  // Filter nav items by permissions
+  const filteredNav = navItems
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        const subject = NAV_SUBJECT_MAP[item.href] as Subject | undefined;
+        if (!subject) return true;
+        return ability.can("view", subject);
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
+
   return (
     <Sidebar>
       <SidebarHeader className="border-b px-4 py-3">
@@ -103,7 +129,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent>
-        {navItems.map((group) => (
+        {filteredNav.map((group) => (
           <SidebarGroup key={group.label}>
             <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
             <SidebarGroupContent>
@@ -112,7 +138,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname === item.href}
+                      isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
                     >
                       <Link href={item.href}>
                         <item.icon className="h-4 w-4" />
@@ -139,7 +165,9 @@ export function AppSidebar({ user }: AppSidebarProps) {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col text-left text-xs leading-tight">
-                    <span className="font-medium truncate">{user.name || user.email}</span>
+                    <span className="font-medium truncate">
+                      {user.name || user.email}
+                    </span>
                     <span className="text-muted-foreground truncate">
                       {user.role}
                     </span>

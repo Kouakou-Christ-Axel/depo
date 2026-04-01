@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { recordClientPaymentAction } from "@/features/clients/actions/recordClientPayment.action";
+import { useRecordPayment } from "@/hooks/use-mutations";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +60,8 @@ export function PaymentDialog({ open, client, onClose, onSuccess }: PaymentDialo
     },
   });
 
+  const paymentMutation = useRecordPayment();
+
   useEffect(() => {
     if (open) {
       reset({ amount: 0, method: "Espèces", reference: "", notes: "" });
@@ -72,27 +74,26 @@ export function PaymentDialog({ open, client, onClose, onSuccess }: PaymentDialo
     if (!client) return;
     setServerError("");
 
-    const result = await recordClientPaymentAction({
-      clientId: client.id,
-      amount: data.amount,
-      method: data.method || undefined,
-      reference: data.reference || undefined,
-      notes: data.notes || undefined,
-    });
+    try {
+      const result = await paymentMutation.mutateAsync({
+        clientId: client.id,
+        amount: data.amount,
+        method: data.method || undefined,
+        reference: data.reference || undefined,
+        notes: data.notes || undefined,
+      });
 
-    if (!result.success) {
-      setServerError(result.error ?? "Erreur");
-      return;
+      setReceipt({
+        id: result.paymentId,
+        amount: data.amount,
+        method: data.method,
+        date: new Date().toLocaleDateString("fr-FR"),
+      });
+
+      onSuccess();
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Erreur");
     }
-
-    setReceipt({
-      id: result.data!.payment.id,
-      amount: data.amount,
-      method: data.method,
-      date: new Date().toLocaleDateString("fr-FR"),
-    });
-
-    onSuccess();
   }
 
   function handlePrintReceipt() {

@@ -3,8 +3,8 @@
 import { requireAnyRole } from '@/lib/auth-helpers';
 import { UserRole } from '@/generated/prisma/client';
 import {
-  createStockAdjustmentSchema,
   CreateStockAdjustmentInput,
+  createStockAdjustmentSchema,
 } from '../schemas/createStockAdjustment.schema';
 import { createStockAdjustment } from '../service';
 
@@ -18,7 +18,10 @@ export async function createStockAdjustmentAction(
     ]);
     const validatedInput = createStockAdjustmentSchema.parse(input);
     const result = await createStockAdjustment(validatedInput, user.id);
-    return { success: true, data: result };
+    return {
+      success: true,
+      data: { stockMovementId: result.stockMovement.id },
+    };
   } catch (error) {
     return {
       success: false,
